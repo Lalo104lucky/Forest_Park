@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nivel 1 - Evita los charcos</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            background-image: url('./resources/img/bosque.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            width: 85vw;
+            height: 85vh;
+            background: transparent;
+        }
+
+        #info {
+            position: absolute;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            background: rgba(30, 41, 59, 0.85);
+            padding: 14px 28px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            border-radius: 16px;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 24px #0006;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            letter-spacing: 0.5px;
+            border: 2px solid #f43f5e;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+        }
+
+        .info-icon {
+            font-size: 1.4em;
+            filter: drop-shadow(0 1px 2px #0008);
+        }
+
+        .info-sep {
+            color: #fbbf24;
+            font-size: 1.2em;
+            margin: 0 6px;
+            font-weight: bold;
+        }
+
+        #nivel-info {
+            position: fixed;
+            right: 32px;
+            bottom: 24px;
+            background: rgba(30, 41, 59, 0.92);
+            color: #fff;
+            padding: 14px 28px 14px 20px;
+            border-radius: 16px 32px 16px 32px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 1.15rem;
+            box-shadow: 0 4px 24px #0007;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 2px solid #22c55e;
+            z-index: 100;
+            letter-spacing: 0.5px;
+            opacity: 1;
+            transition: opacity 1s ease;
+        }
+
+        .nivel-icon {
+            font-size: 1.7em;
+            filter: drop-shadow(0 1px 2px #16653499);
+        }
+
+        .nivel-titulo {
+            font-weight: bold;
+            color: #bbf7d0;
+            font-size: 1.13em;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas" width="1200" height="677"></canvas>
+    <div id="nivel-info">
+        <span class="nivel-icon">🌳</span>
+        <span class="nivel-titulo">Nivel 1: Entrada al parque – Evita los charcos</span>
+    </div>
+    <div id="info">
+        <span class="info-item">
+            <span class="info-icon">❤️</span>
+            <span id="vidas">3</span>
+        </span>
+        <span class="info-sep">|</span>
+        <span class="info-item">
+            <span class="info-icon">💰</span>
+            <span id="monedas">0</span>/5
+        </span>
+        <span class="info-sep">|</span>
+        <span class="info-item">
+            <span class="info-icon">⏰</span>
+            <span id="tiempo">60</span>s
+        </span>
+    </div>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        setTimeout(() => {
+            const nivelInfo = document.getElementById("nivel-info");
+            if (nivelInfo) {
+                nivelInfo.style.opacity = "0";
+                setTimeout(() => {
+                    nivelInfo.style.display = "none";
+                }, 1000); // Espera a que termine la transición
+            }
+        }, 2000);
+
+        const jugador = { x: 50, y: 600, size: 48, vidas: 3, monedas: 0 };
+        const velocidad = 5;
+        const meta = { x: 1120, y: 100, size: 48 };
+        let tiempo = 60;
+
+        const sonidoDead = new Audio('./resources/sounds/dead.mp3');
+        sonidoDead.volume = 0.5;
+
+        const sonidoMeta = new Audio('./resources/sounds/meta.mp3');
+        sonidoMeta.volume = 0.5;
+
+        const sonidoCharco = new Audio('./resources/sounds/squishy.mp3');
+        sonidoCharco.volume = 0.5;
+        sonidoCharco.playbackRate = 1.5;
+
+        const sonidoMoneda = new Audio('./resources/sounds/moneda.mp3');
+        sonidoMoneda.volume = 0.2;
+        sonidoMoneda.playbackRate = 1.5;
+
+        const sonidoVida = new Audio('./resources/sounds/vida.mp3');
+        sonidoVida.volume = 0.5;
+        sonidoMoneda.playbackRate = 2.0;
+
+        const musicaFondo = new Audio('./resources/sounds/music1.mp3');
+        musicaFondo.loop = true;
+        musicaFondo.volume = 0.5;
+        musicaFondo.play().catch(error => {
+            console.log('Reproducción bloqueada por el navegador. Requiere interacción del usuario.');
+        });
+
+        document.addEventListener('click', () => {
+            musicaFondo.play();
+        }, { once: true });
+
+        const monedas = [
+            { x: 320, y: 200, trampa: false },
+            { x: 420, y: 520, trampa: true },
+            { x: 700, y: 150, trampa: false },
+            { x: 900, y: 400, trampa: false },
+            { x: 1000, y: 250, trampa: true },
+            { x: 1050, y: 350, trampa: false },
+            { x: 200, y: 250, trampa: true },
+            { x: 500, y: 650, trampa: false },
+
+        ];
+
+        const charcos = [
+            { x: 180, y: 120, size: 60 }, { x: 430, y: 200, size: 60 }, { x: 500, y: 500, size: 60 },
+            { x: 80, y: 300, size: 60 }, { x: 700, y: 450, size: 60 }, { x: 1000, y: 100, size: 60 },
+            { x: 200, y: 350, size: 60 }, { x: 600, y: 600, size: 60 }, { x: 350, y: 600, size: 60 },
+            { x: 800, y: 600, size: 60 }, { x: 1100, y: 200, size: 60 },
+            { x: 150, y: 500, size: 60 }, { x: 900, y: 550, size: 60 }, { x: 300, y: 450, size: 60 },
+            { x: 750, y: 350, size: 60 }, { x: 400, y: 100, size: 60 }, { x: 600, y: 400, size: 60 },
+            { x: 950, y: 300, size: 60 }, { x: 1100, y: 450, size: 60 }, { x: 500, y: 250, size: 60 }
+        ];
+
+        const arboles = [
+            { x: 150, y: 400, size: 40 }, { x: 600, y: 100, size: 40 }, { x: 700, y: 300, size: 40 },
+            { x: 850, y: 200, size: 40 }, { x: 950, y: 500, size: 40 }, { x: 1100, y: 300, size: 40 },
+            { x: 300, y: 350, size: 40 }, { x: 400, y: 250, size: 40 }, { x: 500, y: 150, size: 40 }
+        ];
+
+        const vidaExtra = { x: 820, y: 500, size: 32, visible: true };
+
+        const caminoPuntos = [
+            { x: 50, y: 600 },
+            { x: 50, y: 100 },
+            { x: 300, y: 100 },
+            { x: 400, y: 400 },
+            { x: 600, y: 400 },
+            { x: 600, y: 200 },
+            { x: 1000, y: 200 },
+            { x: 1120, y: 100 },
+        ];
+
+        let keys = {};
+        window.addEventListener("keydown", e => keys[e.key] = true);
+        window.addEventListener("keyup", e => keys[e.key] = false);
+
+        function limpiarTeclas() {
+            keys = {};
+        }
+
+        function mostrarMensaje(texto, color = "#f43f5e") {
+            // Elimina mensaje anterior si existe
+            let anterior = document.getElementById("mensaje-flotante");
+            if (anterior) anterior.remove();
+
+            let msg = document.createElement("div");
+            msg.id = "mensaje-flotante";
+            msg.textContent = texto;
+            msg.style.position = "fixed";
+            msg.style.top = "90px";
+            msg.style.left = "50%";
+            msg.style.transform = "translateX(-50%)";
+            msg.style.background = "rgba(30,41,59,0.95)";
+            msg.style.color = color;
+            msg.style.padding = "16px 32px";
+            msg.style.borderRadius = "16px";
+            msg.style.fontSize = "1.3rem";
+            msg.style.fontWeight = "bold";
+            msg.style.zIndex = 9999;
+            msg.style.boxShadow = "0 4px 24px #0008";
+            msg.style.opacity = "1";
+            msg.style.transition = "opacity 0.5s";
+            document.body.appendChild(msg);
+            setTimeout(() => {
+                msg.style.opacity = "0";
+                setTimeout(() => msg.remove(), 500);
+            }, 1800);
+        }
+
+        function mostrarVictoria(monedas) {
+            let anterior = document.getElementById("victoria-msg");
+            if (anterior) anterior.remove();
+
+            let msg = document.createElement("div");
+            msg.id = "victoria-msg";
+            msg.innerHTML = `🏅 ¡Nivel superado! 🏅<br>
+        <span style="font-size:1.1rem;color:#fff;">Monedas obtenidas: <b>${monedas}</b></span>`;
+            msg.style.position = "fixed";
+            msg.style.top = "90px";
+            msg.style.left = "50%";
+            msg.style.transform = "translateX(-50%)";
+            msg.style.background = "rgba(34,197,94,0.97)"; // verde
+            msg.style.color = "#fff";
+            msg.style.padding = "18px 36px";
+            msg.style.borderRadius = "16px";
+            msg.style.fontSize = "1.4rem";
+            msg.style.fontWeight = "bold";
+            msg.style.zIndex = 9999;
+            msg.style.boxShadow = "0 4px 24px #0008";
+            msg.style.opacity = "1";
+            msg.style.transition = "opacity 0.5s";
+            msg.style.textAlign = "center";
+            document.body.appendChild(msg);
+            setTimeout(() => {
+                msg.style.opacity = "0";
+                setTimeout(() => msg.remove(), 500);
+                window.location.href = "nivel2.html";
+            }, 1400); // Más rápido y discreto
+        }
+
+
+        function colision(a, b, size = 20, circular = false) {
+            if (circular) {
+                const dx = (a.x + a.size / 2) - (b.x + size / 2);
+                const dy = (a.y + a.size / 2) - (b.y + size / 2);
+                const distancia = Math.sqrt(dx * dx + dy * dy);
+                return distancia < (a.size / 2 + size / 2);
+            } else {
+                return a.x < b.x + size && a.x + a.size > b.x && a.y < b.y + size && a.y + a.size > b.y;
+            }
+        }
+
+
+        let nivelCompletado = false;
+
+        function actualizar() {
+            if (nivelCompletado) return;
+
+            let prevX = jugador.x, prevY = jugador.y;
+            if (keys["ArrowUp"] || keys["w"]) jugador.y -= velocidad;
+            if (keys["ArrowDown"] || keys["s"]) jugador.y += velocidad;
+            if (keys["ArrowLeft"] || keys["a"]) jugador.x -= velocidad;
+            if (keys["ArrowRight"] || keys["d"]) jugador.x += velocidad;
+
+            jugador.x = Math.max(0, Math.min(canvas.width - jugador.size, jugador.x));
+            jugador.y = Math.max(0, Math.min(canvas.height - jugador.size, jugador.y));
+
+            for (let arbol of arboles) {
+                if (colision(jugador, arbol, arbol.size)) {
+                    jugador.x = prevX;
+                    jugador.y = prevY;
+                }
+            }
+
+            for (let i = 0; i < charcos.length; i++) {
+                if (colision(jugador, charcos[i], charcos[i].size, true)) { // true para circular
+                    sonidoCharco.play();
+                    setTimeout(() => { }, 1000);
+                    jugador.vidas--;
+                    limpiarTeclas();
+                    mostrarMensaje("¡Cuidado! Perdiste una vida por pisar un charco. Vidas restantes: " + jugador.vidas);
+                    charcos.splice(i, 1);
+                    if (jugador.vidas <= 0) {
+                        sonidoDead.play();
+                        setTimeout(() => { }, 1000);
+                        reiniciar();
+                    }
+                    break;
+                }
+            }
+
+            for (let i = 0; i < monedas.length; i++) {
+                if (colision(jugador, monedas[i], 32)) {
+                    if (monedas[i].trampa) {
+                        sonidoDead.play();
+                        setTimeout(() => { }, 1000);
+                        jugador.vidas--;
+                        limpiarTeclas();
+                        mostrarMensaje("¡Era una moneda trampa! Perdiste una vida. Vidas restantes: " + jugador.vidas);
+                        if (jugador.vidas <= 0) {
+                            sonidoDead.play();
+                            setTimeout(() => { }, 1000);
+                            reiniciar();
+                        }
+                    } else {
+                        jugador.monedas++;
+                        sonidoMoneda.play();
+                    }
+                    monedas.splice(i, 1);
+                    break;
+
+                }
+            }
+
+            if (
+                vidaExtra.visible &&
+                jugador.x < vidaExtra.x + vidaExtra.size &&
+                jugador.x + jugador.size > vidaExtra.x &&
+                jugador.y < vidaExtra.y + vidaExtra.size &&
+                jugador.y + jugador.size > vidaExtra.y
+            ) {
+                jugador.vidas++;
+                sonidoVida.play();
+                vidaExtra.visible = false;
+                limpiarTeclas();
+                mostrarMensaje("¡Encontraste una vida extra! ❤️ Vidas: " + jugador.vidas, "#22c55e");
+            }
+
+            if (colision(jugador, meta, meta.size) && !nivelCompletado) {
+                nivelCompletado = true;
+                mostrarVictoria(jugador.monedas);
+                sonidoMeta.play();
+                musicaFondo.pause();
+            }
+            document.getElementById("vidas").textContent = jugador.vidas;
+            document.getElementById("monedas").textContent = jugador.monedas;
+        }
+
+        function dibujarCamino(ctx) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(caminoPuntos[0].x, caminoPuntos[0].y);
+            for (let i = 1; i < caminoPuntos.length; i++) {
+                ctx.lineTo(caminoPuntos[i].x, caminoPuntos[i].y);
+            }
+            ctx.strokeStyle = "rgba(255,255,255,0.10)";
+            ctx.lineWidth = 12;
+            ctx.setLineDash([24, 18]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        function drawCharco(ctx, x, y, size) {
+            ctx.save();
+            ctx.translate(x + size / 2, y + size / 2);
+            ctx.scale(size / 60, size / 60);
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, Math.PI * 2);
+            ctx.fillStyle = "#4fd1ff";
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 18, 10, 0, 0, Math.PI * 2);
+            ctx.fillStyle = "#b3e5fc";
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawMoneda(ctx, x, y, trampa) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.beginPath();
+            ctx.arc(0, 0, 16, 0, Math.PI * 2);
+            ctx.fillStyle = trampa ? "#e11d48" : "#ffd700";
+            ctx.shadowColor = trampa ? "#e11d48" : "#fff";
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = trampa ? "#b91c1c" : "#bfa100";
+            ctx.stroke();
+            ctx.font = "bold 18px sans-serif";
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(trampa ? "!" : "$", 0, 2);
+            ctx.restore();
+        }
+
+        const pinkyImg = new Image();
+        pinkyImg.src = './resources/img/dan.png';
+
+        function drawJugador(ctx, x, y, size) {
+            ctx.save();
+            ctx.drawImage(pinkyImg, x, y, size, size);
+            ctx.restore();
+        }
+
+        function drawMeta(ctx, x, y, size) {
+            ctx.save();
+            ctx.translate(x + size / 2, y + size / 2);
+            ctx.scale(size / 48, size / 48);
+
+            // Base del poste
+            ctx.save();
+            ctx.fillStyle = "#b0b0b0";
+            ctx.beginPath();
+            ctx.ellipse(-10, 24, 12, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Poste
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(-10, 20);
+            ctx.lineTo(-10, -20);
+            ctx.lineWidth = 7;
+            ctx.strokeStyle = "#8b5c2a";
+            ctx.shadowColor = "#d1a36a";
+            ctx.shadowBlur = 6;
+            ctx.stroke();
+            ctx.restore();
+
+            // Bandera (con ondas)
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(-10, -20);
+            ctx.bezierCurveTo(10, -25, 20, -10, 10, -5);
+            ctx.bezierCurveTo(20, 0, 10, 10, -10, 0);
+            ctx.closePath();
+            ctx.fillStyle = "#f43f5e"; // Rosa fuerte
+            ctx.shadowColor = "#fda4af";
+            ctx.shadowBlur = 8;
+            ctx.fill();
+
+            // Detalle blanco en la bandera
+            ctx.beginPath();
+            ctx.moveTo(-8, -17);
+            ctx.bezierCurveTo(6, -20, 14, -8, 7, -4);
+            ctx.bezierCurveTo(14, 0, 6, 7, -8, 2);
+            ctx.closePath();
+            ctx.fillStyle = "#fff";
+            ctx.globalAlpha = 0.5;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.restore();
+
+            // Bola en la punta del poste
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(-10, -20, 5, 0, Math.PI * 2);
+            ctx.fillStyle = "#fde047";
+            ctx.shadowColor = "#facc15";
+            ctx.shadowBlur = 10;
+            ctx.fill();
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        function dibujar() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            dibujarCamino(ctx);
+            drawJugador(ctx, jugador.x, jugador.y, jugador.size);
+            for (let moneda of monedas) drawMoneda(ctx, moneda.x, moneda.y, moneda.trampa);
+            for (let charco of charcos) drawCharco(ctx, charco.x, charco.y, charco.size);
+            for (let arbol of arboles) {
+                ctx.save();
+                // Tronco
+                ctx.fillStyle = "#a16207";
+                ctx.fillRect(arbol.x + arbol.size * 0.4, arbol.y + arbol.size * 0.7, arbol.size * 0.2, arbol.size * 0.6);
+
+                // Copa principal
+                ctx.beginPath();
+                ctx.arc(arbol.x + arbol.size / 2, arbol.y + arbol.size * 0.6, arbol.size * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = "#22c55e";
+                ctx.shadowColor = "#166534";
+                ctx.shadowBlur = 12;
+                ctx.fill();
+
+                // Copa secundaria (izquierda)
+                ctx.beginPath();
+                ctx.arc(arbol.x + arbol.size * 0.32, arbol.y + arbol.size * 0.7, arbol.size * 0.22, 0, Math.PI * 2);
+                ctx.fillStyle = "#4ade80";
+                ctx.shadowBlur = 8;
+                ctx.fill();
+
+                // Copa secundaria (derecha)
+                ctx.beginPath();
+                ctx.arc(arbol.x + arbol.size * 0.68, arbol.y + arbol.size * 0.7, arbol.size * 0.22, 0, Math.PI * 2);
+                ctx.fillStyle = "#4ade80";
+                ctx.shadowBlur = 8;
+                ctx.fill();
+
+                // Detalle de luz
+                ctx.beginPath();
+                ctx.arc(arbol.x + arbol.size * 0.45, arbol.y + arbol.size * 0.55, arbol.size * 0.12, 0, Math.PI * 2);
+                ctx.fillStyle = "#bbf7d0";
+                ctx.globalAlpha = 0.7;
+                ctx.shadowBlur = 0;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                ctx.restore();
+            }
+            if (vidaExtra.visible) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(vidaExtra.x + vidaExtra.size / 2, vidaExtra.y + vidaExtra.size / 2, vidaExtra.size / 2, 0, Math.PI * 2);
+                ctx.fillStyle = "#f43f5e";
+                ctx.shadowColor = "#fff";
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.font = "bold 22px Arial";
+                ctx.fillStyle = "#fff";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("❤️", vidaExtra.x + vidaExtra.size / 2, vidaExtra.y + vidaExtra.size / 2 + 1);
+                ctx.restore();
+            }
+            drawMeta(ctx, meta.x, meta.y, meta.size);
+        }
+
+        function bucle() {
+            actualizar();
+            dibujar();
+            requestAnimationFrame(bucle);
+        }
+
+        let intervaloTemporizador = null;
+
+        function iniciarTemporizador() {
+            clearInterval(intervaloTemporizador);
+            intervaloTemporizador = setInterval(() => {
+                tiempo--;
+                document.getElementById("tiempo").textContent = tiempo;
+                if (tiempo <= 0) {
+                    clearInterval(intervaloTemporizador);
+                    mostrarMensaje("⏰ ¡Tiempo agotado!");
+                    sonidoDead.play();
+                    reiniciar();
+                }
+            }, 1000);
+        }
+
+        function reiniciar() {
+            jugador.x = 50;
+            jugador.y = 600;
+            jugador.vidas = 3;
+            jugador.monedas = 0;
+            tiempo = 60;
+            limpiarTeclas();
+            monedas.splice(0, monedas.length,
+                { x: 320, y: 200, trampa: false },
+                { x: 420, y: 520, trampa: true },
+                { x: 700, y: 150, trampa: false },
+                { x: 900, y: 400, trampa: false },
+                { x: 1000, y: 250, trampa: true },
+                { x: 1050, y: 350, trampa: false },
+                { x: 200, y: 250, trampa: true },
+                { x: 500, y: 650, trampa: false },
+            );
+            charcos.splice(0, charcos.length,
+                { x: 180, y: 120, size: 60 }, { x: 430, y: 200, size: 60 }, { x: 500, y: 500, size: 60 },
+                { x: 80, y: 300, size: 60 }, { x: 700, y: 450, size: 60 }, { x: 1000, y: 100, size: 60 },
+                { x: 200, y: 350, size: 60 }, { x: 600, y: 600, size: 60 }, { x: 350, y: 600, size: 60 },
+                { x: 800, y: 600, size: 60 }, { x: 1100, y: 200, size: 60 },
+                { x: 150, y: 500, size: 60 }, { x: 900, y: 550, size: 60 }, { x: 300, y: 450, size: 60 },
+                { x: 750, y: 350, size: 60 }, { x: 400, y: 100, size: 60 }, { x: 600, y: 400, size: 60 },
+                { x: 950, y: 300, size: 60 }, { x: 1100, y: 450, size: 60 }, { x: 500, y: 250, size: 60 }
+            );
+            iniciarTemporizador();
+            vidaExtra.visible = true;
+        }
+
+        iniciarTemporizador();
+        bucle();
+    </script>
+</body>
+
+</html>

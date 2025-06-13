@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nivel 2 - Esquiva los columpios locos</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      background-image: url('./resources/img/bosque.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      display: block;
+      width: 85vw;
+      height: 85vh;
+      background: transparent;
+    }
+
+    #info {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      background: rgba(30, 41, 59, 0.85);
+      padding: 14px 28px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      border-radius: 16px;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 24px #0006;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      letter-spacing: 0.5px;
+      border: 2px solid #f43f5e;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+    }
+
+    .info-icon {
+      font-size: 1.4em;
+      filter: drop-shadow(0 1px 2px #0008);
+    }
+
+    .info-sep {
+      color: #fbbf24;
+      font-size: 1.2em;
+      margin: 0 6px;
+      font-weight: bold;
+    }
+
+    #nivel-info {
+      position: fixed;
+      left: 32px;
+      bottom: 24px;
+      background: rgba(30, 41, 59, 0.92);
+      color: #fff;
+      padding: 14px 28px 14px 20px;
+      border-radius: 16px 32px 16px 32px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 1.15rem;
+      box-shadow: 0 4px 24px #0007;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 2px solid #22c55e;
+      z-index: 100;
+      letter-spacing: 0.5px;
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+
+    .nivel-icon {
+      font-size: 1.7em;
+      filter: drop-shadow(0 1px 2px #16653499);
+    }
+
+    .nivel-titulo {
+      font-weight: bold;
+      color: #bbf7d0;
+      font-size: 1.13em;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="gameCanvas" width="1200" height="677"></canvas>
+  <div id="nivel-info">
+    <span class="nivel-icon">🌳</span>
+    <span class="nivel-titulo">Nivel 2: Zona de juegos – Esquiva los columpios locos</span>
+  </div>
+  <div id="info">
+    <span class="info-item">
+      <span class="info-icon">❤️</span>
+      <span id="vidas">3</span>
+    </span>
+    <span class="info-sep">|</span>
+    <span class="info-item">
+      <span class="info-icon">💰</span>
+      <span id="monedas">0</span>/3
+    </span>
+    <span class="info-sep">|</span>
+    <span class="info-item">
+      <span class="info-icon">⏰</span>
+      <span id="tiempo">60</span>s
+    </span>
+  </div>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    setTimeout(() => {
+      const nivelInfo = document.getElementById("nivel-info");
+      if (nivelInfo) {
+        nivelInfo.style.opacity = "0";
+        setTimeout(() => {
+          nivelInfo.style.display = "none";
+        }, 1000); // Espera a que termine la transición
+      }
+    }, 2000);
+
+    let caminoIndex = 0; // En qué segmento del camino está el jugador
+    let caminoT = 0;     // Progreso de 0 a 1 en el segmento actual
+
+    const jugador = { x: 80, y: 100, size: 48, vidas: 3 };
+    const velocidad = 5;
+    const meta = { x: 1100, y: 600, size: 48 };
+    let tiempo = 60;
+
+    const vidaExtra = { x: 600, y: 300, size: 36, visible: true }; // Cambia la posición si quieres
+
+    const monedas = [
+      { x: 250, y: 100, size: 28, visible: true },
+      { x: 900, y: 300, size: 28, visible: true },
+      { x: 400, y: 500, size: 28, visible: true }
+    ];
+
+    jugador.monedas = 0; // Inicializa el contador de monedas
+
+    const caminoPuntos = [
+      { x: 80, y: 100 },
+      { x: 1100, y: 100 },
+      { x: 1100, y: 300 },
+      { x: 50, y: 300 },
+      { x: 50, y: 500 },
+      { x: 1100, y: 500 },
+      { x: 1100, y: 600 },
+    ];
+
+
+    const columpios = [
+      { x: 200, y: 100, baseX: 200, baseY: 100, size: 60, vy: 2.5, dir: 1, minY: 80, maxY: 200 },
+      { x: 400, y: 100, baseX: 400, baseY: 100, size: 60, vy: 2.5, dir: 1, minY: 80, maxY: 200 },
+      { x: 800, y: 100, baseX: 800, baseY: 100, size: 60, vy: 2.5, dir: 1, minY: 80, maxY: 200 },
+      { x: 1000, y: 200, baseX: 1000, baseY: 200, size: 60, vy: 2.5, dir: 1, minY: 80, maxY: 300 },
+      { x: 900, y: 200, baseX: 900, baseY: 200, size: 60, vy: 2.5, dir: 1, minY: 180, maxY: 400 },
+      { x: 700, y: 200, baseX: 700, baseY: 200, size: 60, vy: 2.5, dir: 1, minY: 180, maxY: 400 },
+      { x: 500, y: 200, baseX: 500, baseY: 200, size: 60, vy: 2.5, dir: 1, minY: 180, maxY: 400 },
+      { x: 300, y: 200, baseX: 300, baseY: 200, size: 60, vy: 2.5, dir: 1, minY: 180, maxY: 400 },
+      { x: 800, y: 500, baseX: 800, baseY: 500, size: 60, vy: 2.5, dir: 1, minY: 400, maxY: 600 },
+      { x: 200, y: 500, baseX: 200, baseY: 500, size: 60, vy: 2.5, dir: 1, minY: 400, maxY: 600 },
+      { x: 400, y: 500, baseX: 400, baseY: 500, size: 60, vy: 2.5, dir: 1, minY: 400, maxY: 600 },
+      { x: 600, y: 500, baseX: 600, baseY: 500, size: 60, vy: 2.5, dir: 1, minY: 400, maxY: 600 },
+      { x: 1000, y: 500, baseX: 1000, baseY: 500, size: 60, vy: 2.5, dir: 1, minY: 400, maxY: 600 },
+    ];
+
+    const sonidoDead = new Audio('./resources/sounds/dead.mp3');
+    sonidoDead.volume = 0.5;
+
+    const sonidoMeta = new Audio('./resources/sounds/meta.mp3');
+    sonidoMeta.volume = 0.5;
+
+    const sonidoMoneda = new Audio('./resources/sounds/moneda.mp3');
+        sonidoMoneda.volume = 0.2;
+        sonidoMoneda.playbackRate = 1.5;
+
+    const sonidoVida = new Audio('./resources/sounds/vida.mp3');
+    sonidoVida.volume = 0.5;
+
+    const musicaFondo = new Audio('./resources/sounds/music2.mp3');
+    musicaFondo.loop = true;
+    musicaFondo.volume = 0.2;
+    musicaFondo.play().catch(error => {
+      console.log('Reproducción bloqueada por el navegador. Requiere interacción del usuario.');
+    });
+
+    document.addEventListener('click', () => {
+      musicaFondo.play();
+    }, { once: true });
+
+    let keys = {};
+    window.addEventListener("keydown", e => keys[e.key] = true);
+    window.addEventListener("keyup", e => keys[e.key] = false);
+
+    function limpiarTeclas() {
+      keys = {};
+    }
+
+    function colision(a, b, size = 20, circular = false) {
+      if (circular) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const distancia = Math.sqrt(dx * dx + dy * dy);
+        return distancia < (a.size / 2 + size / 2);
+      } else {
+        return a.x < b.x + size && a.x + a.size > b.x && a.y < b.y + size && a.y + a.size > b.y;
+      }
+    }
+
+    function moverEnCamino(direccion) {
+      // direccion: +1 para adelante, -1 para atrás
+      const actual = caminoPuntos[caminoIndex];
+      const siguiente = caminoPuntos[caminoIndex + 1];
+      if (!siguiente && direccion > 0) return;
+      if (caminoIndex === 0 && caminoT <= 0 && direccion < 0) return;
+
+      // Calcula el vector del segmento
+      const dx = siguiente.x - actual.x;
+      const dy = siguiente.y - actual.y;
+      const distancia = Math.sqrt(dx * dx + dy * dy);
+      const paso = velocidad / distancia;
+
+      caminoT += direccion * paso;
+
+      // Si se pasa del segmento, avanza al siguiente
+      if (caminoT > 1 && caminoIndex < caminoPuntos.length - 2) {
+        caminoIndex++;
+        caminoT = 0;
+      } else if (caminoT < 0 && caminoIndex > 0) {
+        caminoIndex--;
+        caminoT = 1;
+      }
+
+      // Limita caminoT entre 0 y 1
+      caminoT = Math.max(0, Math.min(1, caminoT));
+
+      // Actualiza la posición real del jugador
+      const start = caminoPuntos[caminoIndex];
+      const end = caminoPuntos[caminoIndex + 1];
+      jugador.x = start.x + (end.x - start.x) * caminoT;
+      jugador.y = start.y + (end.y - start.y) * caminoT;
+    }
+
+    let invulnerable = false;
+    let nivelCompletado = false;
+
+    function actualizar() {
+      if (nivelCompletado) return;
+
+      if (keys["ArrowRight"] || keys["d"]) moverEnCamino(+1);
+      if (keys["ArrowLeft"] || keys["a"]) moverEnCamino(-1);
+
+      // Colisión con columpios
+      if (!invulnerable) {
+        for (let columpio of columpios) {
+          if (colision(jugador, columpio, columpio.size, true)) {
+            sonidoDead.play();
+            jugador.vidas--;
+            limpiarTeclas();
+            mostrarMensaje("¡Cuidado! Te pegó un columpio loco. Vidas restantes: " + jugador.vidas);
+            invulnerable = true;
+            setTimeout(() => invulnerable = false, 1500);
+            if (jugador.vidas <= 0) {
+              mostrarMensaje("¡Game Over! Te quedaste sin vidas.");
+              reiniciar();
+            }
+            break;
+          }
+        }
+      }
+
+      // Vida extra
+      if (
+        vidaExtra.visible &&
+        Math.hypot(jugador.x - vidaExtra.x, jugador.y - vidaExtra.y) < (jugador.size / 2 + vidaExtra.size / 2)
+      ) {
+        jugador.vidas++;
+        vidaExtra.visible = false;
+        sonidoVida.play();
+        mostrarMensaje("¡Encontraste una vida extra! ❤️ Vidas: " + jugador.vidas, "#22d3ee");
+      }
+
+      // Monedas
+      for (let moneda of monedas) {
+        if (
+          moneda.visible &&
+          Math.hypot(jugador.x - moneda.x, jugador.y - moneda.y) < (jugador.size / 2 + moneda.size / 2)
+        ) {
+          moneda.visible = false;
+          jugador.monedas = (jugador.monedas || 0) + 1;
+          sonidoMoneda.play();
+          mostrarMensaje("¡Moneda conseguida! $ Total: " + jugador.monedas, "#fbbf24");
+        }
+      }
+
+      // Meta
+      if (colision(jugador, meta, meta.size) && !nivelCompletado) {
+        nivelCompletado = true;
+        mostrarVictoria(jugador.monedas);
+        sonidoMeta.play();
+        musicaFondo.pause();
+      }
+      document.getElementById("monedas").textContent = jugador.monedas || 0;
+      document.getElementById("vidas").textContent = jugador.vidas;
+    }
+
+
+    function drawColumpio(ctx, columpio) {
+      ctx.save();
+
+      // Cuerda con degradado
+      const grad = ctx.createLinearGradient(
+        columpio.x, columpio.y - 40,
+        columpio.x, columpio.y + columpio.size * 0.35
+      );
+      grad.addColorStop(0, "#fbbf24");
+      grad.addColorStop(1, "#a16207");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(columpio.x, columpio.y - 40);
+      ctx.lineTo(columpio.x, columpio.y + columpio.size * 0.35);
+      ctx.stroke();
+
+      // Asiento de madera con detalles
+      ctx.save();
+      ctx.translate(columpio.x, columpio.y + columpio.size * 0.5);
+      ctx.rotate(Math.sin(Date.now() / 400 + columpio.x) * 0.08); // pequeño vaivén
+      ctx.beginPath();
+      ctx.ellipse(0, 0, columpio.size * 0.42, columpio.size * 0.18, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#eab308";
+      ctx.shadowColor = "#facc15";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#a16207";
+      ctx.stroke();
+
+      // Detalles de madera (líneas)
+      ctx.beginPath();
+      ctx.moveTo(-columpio.size * 0.25, -columpio.size * 0.05);
+      ctx.lineTo(columpio.size * 0.25, -columpio.size * 0.05);
+      ctx.moveTo(-columpio.size * 0.18, columpio.size * 0.05);
+      ctx.lineTo(columpio.size * 0.18, columpio.size * 0.05);
+      ctx.strokeStyle = "#b45309";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Carita sonriente
+      ctx.beginPath();
+      ctx.arc(0, 0, columpio.size * 0.09, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      // Ojos
+      ctx.beginPath();
+      ctx.arc(-columpio.size * 0.03, -columpio.size * 0.02, 2, 0, Math.PI * 2);
+      ctx.arc(columpio.size * 0.03, -columpio.size * 0.02, 2, 0, Math.PI * 2);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+      // Boca
+      ctx.beginPath();
+      ctx.arc(0, 3, 7, Math.PI * 0.15, Math.PI * 0.85, false);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "#222";
+      ctx.stroke();
+
+      ctx.restore();
+      ctx.restore();
+    }
+
+    function mostrarMensaje(texto, color = "#f43f5e") {
+      // Elimina mensaje anterior si existe
+      let anterior = document.getElementById("mensaje-flotante");
+      if (anterior) anterior.remove();
+
+      let msg = document.createElement("div");
+      msg.id = "mensaje-flotante";
+      msg.textContent = texto;
+      msg.style.position = "fixed";
+      msg.style.top = "90px";
+      msg.style.left = "50%";
+      msg.style.transform = "translateX(-50%)";
+      msg.style.background = "rgba(30,41,59,0.95)";
+      msg.style.color = color;
+      msg.style.padding = "16px 32px";
+      msg.style.borderRadius = "16px";
+      msg.style.fontSize = "1.3rem";
+      msg.style.fontWeight = "bold";
+      msg.style.zIndex = 9999;
+      msg.style.boxShadow = "0 4px 24px #0008";
+      msg.style.opacity = "1";
+      msg.style.transition = "opacity 0.5s";
+      document.body.appendChild(msg);
+      setTimeout(() => {
+        msg.style.opacity = "0";
+        setTimeout(() => msg.remove(), 500);
+      }, 1800);
+    }
+
+    function mostrarVictoria(monedas) {
+            let anterior = document.getElementById("victoria-msg");
+            if (anterior) anterior.remove();
+
+            let msg = document.createElement("div");
+            msg.id = "victoria-msg";
+            msg.innerHTML = `🏅 ¡Nivel superado! 🏅<br>
+        <span style="font-size:1.1rem;color:#fff;">Monedas obtenidas: <b>${monedas}</b></span>`;
+            msg.style.position = "fixed";
+            msg.style.top = "90px";
+            msg.style.left = "50%";
+            msg.style.transform = "translateX(-50%)";
+            msg.style.background = "rgba(34,197,94,0.97)"; // verde
+            msg.style.color = "#fff";
+            msg.style.padding = "18px 36px";
+            msg.style.borderRadius = "16px";
+            msg.style.fontSize = "1.4rem";
+            msg.style.fontWeight = "bold";
+            msg.style.zIndex = 9999;
+            msg.style.boxShadow = "0 4px 24px #0008";
+            msg.style.opacity = "1";
+            msg.style.transition = "opacity 0.5s";
+            msg.style.textAlign = "center";
+            document.body.appendChild(msg);
+            setTimeout(() => {
+                msg.style.opacity = "0";
+                setTimeout(() => msg.remove(), 500);
+                window.location.href = "nivel3.html";
+            }, 1400); // Más rápido y discreto
+        }
+
+    const pinkyImg = new Image();
+    pinkyImg.src = './resources/img/dan.png';
+
+    function drawJugador(ctx, x, y, size) {
+      ctx.save();
+      ctx.drawImage(pinkyImg, x - size / 2, y - size / 2, size, size);
+      ctx.restore();
+    }
+
+    function drawMeta(ctx, x, y, size) {
+      ctx.save();
+      ctx.translate(x + size / 2, y + size / 2);
+      ctx.scale(size / 48, size / 48);
+
+      // Base del poste
+      ctx.save();
+      ctx.fillStyle = "#b0b0b0";
+      ctx.beginPath();
+      ctx.ellipse(-10, 24, 12, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Poste
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-10, 20);
+      ctx.lineTo(-10, -20);
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = "#8b5c2a";
+      ctx.shadowColor = "#d1a36a";
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.restore();
+
+      // Bandera (con ondas)
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-10, -20);
+      ctx.bezierCurveTo(10, -25, 20, -10, 10, -5);
+      ctx.bezierCurveTo(20, 0, 10, 10, -10, 0);
+      ctx.closePath();
+      ctx.fillStyle = "#f43f5e";
+      ctx.shadowColor = "#fda4af";
+      ctx.shadowBlur = 8;
+      ctx.fill();
+
+      // Detalle blanco en la bandera
+      ctx.beginPath();
+      ctx.moveTo(-8, -17);
+      ctx.bezierCurveTo(6, -20, 14, -8, 7, -4);
+      ctx.bezierCurveTo(14, 0, 6, 7, -8, 2);
+      ctx.closePath();
+      ctx.fillStyle = "#fff";
+      ctx.globalAlpha = 0.5;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // Bola en la punta del poste
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(-10, -20, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#fde047";
+      ctx.shadowColor = "#facc15";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    function dibujarCamino(ctx) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(caminoPuntos[0].x, caminoPuntos[0].y);
+      for (let i = 1; i < caminoPuntos.length; i++) {
+        ctx.lineTo(caminoPuntos[i].x, caminoPuntos[i].y);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.10)";
+      ctx.lineWidth = 12;
+      ctx.setLineDash([24, 18]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function dibujar() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      dibujarCamino(ctx);
+
+      // Dibuja columpios
+      for (let columpio of columpios) drawColumpio(ctx, columpio);
+
+      // Jugador
+      drawJugador(ctx, jugador.x, jugador.y, jugador.size);
+
+      // Dibuja vida extra
+      if (vidaExtra.visible) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(vidaExtra.x, vidaExtra.y, vidaExtra.size / 2, 0, Math.PI * 2);
+        ctx.fillStyle = "#f43f5e";
+        ctx.shadowColor = "#fff";
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.font = "bold 22px Arial";
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("❤️", vidaExtra.x, vidaExtra.y + 1);
+        ctx.restore();
+      }
+
+      for (let moneda of monedas) {
+        if (moneda.visible) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(moneda.x, moneda.y, moneda.size / 2, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffd700";
+          ctx.shadowColor = "#fff";
+          ctx.shadowBlur = 8;
+          ctx.fill();
+          ctx.font = "bold 20px Arial";
+          ctx.fillStyle = "#fff";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("$", moneda.x, moneda.y + 1);
+          ctx.restore();
+        }
+      }
+
+      // Meta
+      drawMeta(ctx, meta.x, meta.y, meta.size);
+    }
+
+
+    function bucle() {
+      for (let c of columpios) {
+        c.y += c.vy * c.dir;
+        if (c.y <= c.minY || c.y >= c.maxY) c.dir *= -1;
+      }
+      actualizar();
+      dibujar();
+      requestAnimationFrame(bucle);
+    }
+
+    let intervaloTemporizador = null;
+
+    function iniciarTemporizador() {
+      clearInterval(intervaloTemporizador);
+      intervaloTemporizador = setInterval(() => {
+        tiempo--;
+        document.getElementById("tiempo").textContent = tiempo;
+        if (tiempo <= 0) {
+          clearInterval(intervaloTemporizador);
+          mostrarMensaje("⏰ ¡Tiempo agotado!");
+          sonidoDead.play();
+          reiniciar();
+        }
+      }, 1000);
+    }
+
+
+    function reiniciar() {
+      caminoIndex = 0;
+      caminoT = 0;
+      const start = caminoPuntos[0];
+      const next = caminoPuntos[1];
+      jugador.x = start.x;
+      jugador.y = start.y;
+      jugador.vidas = 3;
+      tiempo = 60;
+      limpiarTeclas();
+      for (let c of columpios) {
+        c.x = c.baseX;
+        c.y = c.baseY;
+        c.dir = Math.random() > 0.5 ? 1 : -1;
+      }
+      vidaExtra.visible = true;
+      for (let moneda of monedas) moneda.visible = true;
+      jugador.monedas = 0;
+      iniciarTemporizador();
+    }
+
+    iniciarTemporizador();
+    bucle();
+  </script>
+</body>
+
+</html>
