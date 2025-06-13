@@ -9,7 +9,7 @@
 ## 🎮 Características
 
 - 🧱 **Plataformas Dinámicas:** Controla un bloque y supera obstáculos únicos en cada nivel.
-- 🪙 **Colecciona Monedas:** ¡Recoge todas las monedas para aumentar tu puntuación!
+- $ **Colecciona Monedas:** ¡Recoge todas las monedas para aumentar tu puntuación!
 - 👾 **Enemigos y Desafíos:** Enfréntate a enemigos y trampas que pondrán a prueba tus reflejos.
 - 📈 **Dificultad Progresiva:** Cada nivel es más desafiante que el anterior.
 - 🖱️ **Controles Intuitivos:** Interfaz simple y fácil de entender, ideal para pasar el rato.
